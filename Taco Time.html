@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Taco Adventure</title>
+  <style>
+    body, html { margin: 0; padding: 0; overflow: hidden; background: #000; }
+    canvas { display: block; }
+    /* Psychedelic swirl effect */
+    @keyframes swirl {
+      0% { filter: hue-rotate(0deg); }
+      100% { filter: hue-rotate(360deg); }
+    }
+    .psychedelic {
+      animation: swirl 5s linear;
+    }
+    /* Start screen styling */
+    #startScreen {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.8);
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: sans-serif;
+      z-index: 10;
+    }
+    #startScreen button {
+      padding: 10px 20px;
+      font-size: 24px;
+      margin-top: 20px;
+      cursor: pointer;
+    }
+    /* Message display */
+    #message {
+      position: absolute;
+      top: 40%;
+      left: 50%;
+      transform: translate(-50%,-50%);
+      font-size: 60px;
+      color: white;
+      pointer-events: none;
+      text-align: center;
+      z-index: 5;
+    }
+    /* Collected letters display */
+    #letterDisplay {
+      position: absolute;
+      top: 10px; left: 50%;
+      transform: translateX(-50%);
+      font-size: 60px;
+      color: white;
+      pointer-events: none;
+      z-index: 5;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas" width="600" height="800"></canvas>
+  <div id="message"></div>
+  <div id="letterDisplay"></div>
+  <div id="startScreen">
+    <h1>Taco Adventure!!!</h1>
+    <p>Use WASD or Arrow Keys to move<br>
+       Press Space to throw tomatoes and neutralize EVIL SKULLS<br>
+       Avoid skulls and obstacles<br>
+       Collect one each of ingredient - meat (T), pepper (A), onion (C), shamrock (O) to make a taco and win!</p>
+    <button id="startButton">Start Game</button>
+  </div>
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const messageDiv = document.getElementById("message");
+    const letterDisplay = document.getElementById("letterDisplay");
+    const startScreen = document.getElementById("startScreen");
+    const startButton = document.getElementById("startButton");
+
+    // Game area settings
+    const canvasWidth = 600, canvasHeight = 800;
+    const roadWidth = 400;
+    const roadLeft = canvasWidth/2 - roadWidth/2;
+    const roadRight = canvasWidth/2 + roadWidth/2;
+
+    let gameState = "start"; // "start", "running", "gameover", "psychedelic"
+    let dashOffset = 0;
+    let enemySpawnTimer = 0, obstacleSpawnTimer = 0, itemSpawnTimer = 0;
+    let lastTomatoTime = 0;
+
+    // Player: taco emoji with animated feet (using alternating L's)
+    const player = {
+      x: canvasWidth/2,
+      y: canvasHeight - 80,
+      speed: 5,
+      emoji: "🌮",
+      moving: false,
+      footFlash: true,
+      footTimer: 0
+    };
+
+    // Track collected items (only one of each needed)
+    let collectedLetters = {
+      meat: false,    // earns T
+      pepper: false,  // earns A
+      onion: false,   // earns C
+      shamrock: false // earns O
+    };
+
+    // Item types mapping
+    const itemTypes = [
+      { type: "meat", emoji: "🥩", letter: "T" },
+      { type: "pepper", emoji: "🌶️", letter: "A" },
+      { type: "onion", emoji: "🧅", letter: "C" },
+      { type: "shamrock", emoji: "☘️", letter: "O" }
+    ];
+    let items = [];
+    let enemies = [];
+    let obstacles = [];
+    let tomatoes = [];
+
+    // Controls (WASD and Space)
+    const keys = {};
+    document.addEventListener("keydown", (e) => {
+      keys[e.key.toLowerCase()] = true;
+      // Tomato throwing: check rate limit (1 per second)
+      if(e.key === " " && gameState === "running") {
+        let now = Date.now();
+        if(now - lastTomatoTime >= 1000) {
+          tomatoes.push({ x: player.x, y: player.y - 20, speed: 7, emoji: "🍅" });
+          lastTomatoTime = now;
+        }
+      }
+    });
+    document.addEventListener("keyup", (e) => { keys[e.key.toLowerCase()] = false; });
+
+    startButton.addEventListener("click", () => {
+      startScreen.style.display = "none";
+      resetGame();
+      gameState = "running";
+    });
+
+    function resetGame() {
+      gameState = "running";
+      player.x = canvasWidth/2;
+      player.y = canvasHeight - 80;
+      collectedLetters = { meat: false, pepper: false, onion: false, shamrock: false };
+      updateLetterDisplay();
+      items = []; enemies = []; obstacles = []; tomatoes = [];
+      enemySpawnTimer = 0; obstacleSpawnTimer = 0; itemSpawnTimer = 0;
+      messageDiv.textContent = "";
+      document.body.classList.remove("psychedelic");
+    }
+
+    function updateLetterDisplay() {
+      let letters = "";
+      letters += collectedLetters.meat ? "T " : "";
+      letters += collectedLetters.pepper ? "A " : "";
+      letters += collectedLetters.onion ? "C " : "";
+      letters += collectedLetters.shamrock ? "O" : "";
+      letterDisplay.textContent = letters;
+    }
+
+    function spawnItem() {
+      const itemData = itemTypes[Math.floor(Math.random() * itemTypes.length)];
+      items.push({
+        type: itemData.type,
+        emoji: itemData.emoji,
+        letter: itemData.letter,
+        x: Math.random() * ((roadRight - 20) - (roadLeft + 20)) + (roadLeft + 20),
+        y: -50
+      });
+    }
+
+    function spawnEnemy() {
+      enemies.push({
+        x: Math.random() * ((roadRight - 20) - (roadLeft + 20)) + (roadLeft + 20),
+        y: -50,
+        speed: 2,
+        dx: (Math.random()-0.5)*4,
+        emoji: "💀",
+        stopped: false
+      });
+    }
+
+    function spawnObstacle() {
+      const obstacleEmojis = ["🗑️", "🪨", "🌵"];
+      obstacles.push({
+        x: Math.random() * ((roadRight - 20) - (roadLeft + 20)) + (roadLeft + 20),
+        y: -50,
+        speed: 2,
+        emoji: obstacleEmojis[Math.floor(Math.random()*obstacleEmojis.length)]
+      });
+    }
+
+    function update() {
+      if(gameState !== "running") return;
+
+      // Player movement with WASD
+      let moving = false;
+      if(keys["w"] || keys["arrowup"]) { player.y -= player.speed; moving = true; }
+      if(keys["s"] || keys["arrowdown"]) { player.y += player.speed; moving = true; }
+      if(keys["a"] || keys["arrowleft"]) { player.x -= player.speed; moving = true; }
+      if(keys["d"] || keys["arrowright"]) { player.x += player.speed; moving = true; }
+      player.moving = moving;
+
+      // Constrain player within the road area
+      if(player.x < roadLeft+20) player.x = roadLeft+20;
+      if(player.x > roadRight-20) player.x = roadRight-20;
+      if(player.y < 20) player.y = 20;
+      if(player.y > canvasHeight-20) player.y = canvasHeight-20;
+
+      // Animate feet: if moving, toggle every 10 frames
+      if(player.moving) {
+        player.footTimer++;
+        if(player.footTimer > 10) { player.footFlash = !player.footFlash; player.footTimer = 0; }
+      } else { player.footFlash = true; }
+
+      // Update tomatoes (move upward)
+      for(let i = tomatoes.length - 1; i >= 0; i--) {
+        tomatoes[i].y -= tomatoes[i].speed;
+        if(tomatoes[i].y < -20) tomatoes.splice(i,1);
+      }
+
+      // Update items (scroll downward) and check collection
+      items.forEach((item, index) => {
+        item.y += 2;
+        if(Math.hypot(player.x - item.x, player.y - item.y) < 30) {
+          if(!collectedLetters[item.type]) { 
+            collectedLetters[item.type] = true;
+            updateLetterDisplay();
+          }
+          items.splice(index, 1);
+        }
+      });
+
+      // Update enemies
+      enemies.forEach(enemy => {
+        enemy.y += enemy.speed;
+        if(!enemy.stopped) {
+          enemy.x += enemy.dx;
+          if(Math.random() < 0.02) enemy.dx = (Math.random()-0.5)*4;
+        }
+        if(Math.hypot(player.x - enemy.x, player.y - enemy.y) < 30) { gameOver(); }
+      });
+
+      // Update obstacles
+      obstacles.forEach(obstacle => {
+        obstacle.y += obstacle.speed;
+        if(Math.hypot(player.x - obstacle.x, player.y - obstacle.y) < 30) { gameOver(); }
+      });
+
+      // Check tomato collisions with enemies (stop enemy movement)
+      tomatoes.forEach(tomato => {
+        enemies.forEach(enemy => {
+          if(!enemy.stopped && Math.hypot(tomato.x - enemy.x, tomato.y - enemy.y) < 20) {
+            enemy.stopped = true;
+          }
+        });
+      });
+
+      // Spawn new items, enemies, and obstacles periodically
+      itemSpawnTimer++;
+      if(itemSpawnTimer > 100) { spawnItem(); itemSpawnTimer = 0; }
+      enemySpawnTimer++;
+      if(enemySpawnTimer > 120) { spawnEnemy(); enemySpawnTimer = 0; }
+      obstacleSpawnTimer++;
+      if(obstacleSpawnTimer > 150) { spawnObstacle(); obstacleSpawnTimer = 0; }
+
+      // Animate road dashes
+      dashOffset += 2;
+
+      // If all letters are collected, trigger win effect
+      if(collectedLetters.meat && collectedLetters.pepper && collectedLetters.onion && collectedLetters.shamrock) {
+        triggerPsychedelic();
+      }
+    }
+
+    function gameOver() {
+      gameState = "gameover";
+      messageDiv.textContent = "Game Over!";
+      setTimeout(resetGame, 3000);
+    }
+
+    function triggerPsychedelic() {
+      gameState = "psychedelic";
+      messageDiv.innerHTML = "T A C O<br/>TACO TIME! YOU ARE THE TACO MASTER!";
+      document.body.classList.add("psychedelic");
+      setTimeout(resetGame, 5000);
+    }
+
+    function drawRoad() {
+      // Draw green side margins
+      ctx.fillStyle = "#0a0";
+      ctx.fillRect(0, 0, roadLeft, canvasHeight);
+      ctx.fillRect(roadRight, 0, canvasWidth - roadRight, canvasHeight);
+      // Draw grey road
+      ctx.fillStyle = "#808080";
+      ctx.fillRect(roadLeft, 0, roadWidth, canvasHeight);
+      // Draw dashed center line with alternating up-down offsets
+      ctx.strokeStyle = "white";
+      ctx.lineWidth = 2;
+      const dashLength = 20, gap = 20;
+      const centerX = canvasWidth/2;
+      for(let i = 0; i < canvasHeight/(dashLength+gap) + 1; i++){
+        let startY = i*(dashLength+gap) - (dashOffset % (dashLength+gap));
+        let offset = (i % 2 === 0) ? -5 : 5;
+        ctx.beginPath();
+        ctx.moveTo(centerX, startY + offset);
+        ctx.lineTo(centerX, startY + dashLength + offset);
+        ctx.stroke();
+      }
+    }
+
+    // Draw the player's feet
+    function drawPlayerFeet() {
+      ctx.fillStyle = "white"; // Ensure feet are drawn in white
+      if(player.moving) {
+        if(player.footFlash) {
+          ctx.font = "12px sans-serif";
+          ctx.fillText("L", player.x - 12, player.y + 30);
+          ctx.font = "8px sans-serif";
+          ctx.fillText("L", player.x + 12, player.y + 30);
+        } else {
+          ctx.font = "8px sans-serif";
+          ctx.fillText("L", player.x - 12, player.y + 30);
+          ctx.font = "12px sans-serif";
+          ctx.fillText("L", player.x + 12, player.y + 30);
+        }
+      } else {
+        ctx.font = "10px sans-serif";
+        ctx.fillText("L L", player.x, player.y + 30);
+      }
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+      drawRoad();
+
+      // Set white fill for all text drawings
+      ctx.fillStyle = "white";
+
+      // Draw obstacles
+      ctx.font = "30px sans-serif";
+      obstacles.forEach(obstacle => { ctx.fillText(obstacle.emoji, obstacle.x, obstacle.y); });
+
+      // Draw items
+      items.forEach(item => { ctx.fillText(item.emoji, item.x, item.y); });
+
+      // Draw enemies
+      enemies.forEach(enemy => { ctx.fillText(enemy.emoji, enemy.x, enemy.y); });
+
+      // Draw tomatoes
+      tomatoes.forEach(tomato => { ctx.fillText(tomato.emoji, tomato.x, tomato.y); });
+
+      // Draw player taco and its animated feet
+      ctx.font = "40px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(player.emoji, player.x, player.y);
+      drawPlayerFeet();
+    }
+
+    function gameLoop() {
+      update();
+      draw();
+      requestAnimationFrame(gameLoop);
+    }
+    gameLoop();
+  </script>
+</body>
+</html>
+
