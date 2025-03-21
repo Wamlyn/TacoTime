@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Taco Hunter Game</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #eef;
+      cursor: none; /* hide default cursor */
+      user-select: none;
+    }
+    #gameArea, #startScreen {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+    }
+    #startScreen {
+      background: rgba(0, 0, 0, 0.75);
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: sans-serif;
+      z-index: 3000;
+    }
+    .counter {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      font-size: 20px;
+      background: rgba(255,255,255,0.8);
+      padding: 5px 10px;
+      border-radius: 5px;
+      z-index: 1000;
+    }
+    #scoreCounter {
+      left: auto;
+      right: 10px;
+    }
+    /* Crosshair */
+    #crosshair {
+      position: fixed;
+      width: 30px;
+      height: 30px;
+      margin-left: -15px;
+      margin-top: -15px;
+      pointer-events: none;
+      z-index: 2000;
+    }
+    #crosshair:before, #crosshair:after {
+      content: "";
+      position: absolute;
+      background: red;
+    }
+    #crosshair:before {
+      left: 50%;
+      top: 0;
+      width: 2px;
+      height: 100%;
+    }
+    #crosshair:after {
+      top: 50%;
+      left: 0;
+      width: 100%;
+      height: 2px;
+    }
+    /* Taco styling */
+    .taco {
+      position: absolute;
+      font-size: 40px;
+      pointer-events: none;
+      user-select: none;
+    }
+    .feet {
+      position: absolute;
+      top: 40px;
+      left: 0;
+      white-space: pre;
+      font-family: monospace;
+    }
+    .flip {
+      transform: scaleY(-1);
+    }
+    .message {
+      position: absolute;
+      font-size: 16px;
+      background: rgba(255,255,255,0.9);
+      padding: 2px 5px;
+      border-radius: 3px;
+      pointer-events: none;
+      user-select: none;
+    }
+    /* Dot effect */
+    .dot {
+      position: absolute;
+      width: 4px;
+      height: 4px;
+      background: black;
+      border-radius: 50%;
+      pointer-events: none;
+    }
+    /* End game message container */
+    #endContainer {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 32px;
+      background: rgba(255,255,255,0.95);
+      padding: 20px 30px;
+      border-radius: 10px;
+      z-index: 3000;
+      display: none;
+      text-align: center;
+    }
+    #endContainer button {
+      margin-top: 15px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <!-- Start Screen -->
+  <div id="startScreen">
+    <h1>🌮Taco Hunter🌮</h1>
+    <p>Move your mouse to aim the crosshair.</p>
+    <p>Click to shoot.</p>
+    <p>Hit a taco to take it home for dinner. Don't let them get away!</p>
+    <p>Get 12 tacos to win!</p>
+    <button id="startButton">Start Game</button>
+  </div>
+
+  <!-- Game Area -->
+  <div id="gameArea" style="display:none;">
+    <div id="shotsCounter" class="counter">Shots: 20</div>
+    <div id="scoreCounter" class="counter">Hits: 0</div>
+    <div id="endContainer">
+      <div id="endMessage"></div>
+      <button id="restartButton">Play Again</button>
+    </div>
+  </div>
+  <div id="crosshair"></div>
+
+  <script>
+    // Game settings
+    const MAX_SHOTS = 21, REQUIRED_HITS = 12, MAX_TACOS = 4;
+    let shotsLeft, hits, tacos = [], animationFrame;
+    const gameArea = document.getElementById("gameArea");
+    const shotsCounter = document.getElementById("shotsCounter");
+    const scoreCounter = document.getElementById("scoreCounter");
+    const endContainer = document.getElementById("endContainer");
+    const endMessage = document.getElementById("endMessage");
+    const startScreen = document.getElementById("startScreen");
+    const startButton = document.getElementById("startButton");
+    const restartButton = document.getElementById("restartButton");
+    const crosshair = document.getElementById("crosshair");
+
+    // Taco class with alternating feet animation
+    class Taco {
+      constructor() {
+        this.elem = document.createElement("div");
+        this.elem.classList.add("taco");
+        this.elem.innerHTML = "🌮";
+        // Feet element
+        this.feet = document.createElement("div");
+        this.feet.classList.add("feet");
+        // Initial feet pattern: left = 12pt, right = 8pt.
+        this.leftBig = true;
+        this.updateFeet();
+        this.elem.appendChild(this.feet);
+        gameArea.appendChild(this.elem);
+
+        // Random vertical starting position
+        this.y = Math.random() * (window.innerHeight - 100) + 20;
+        this.x = -50;
+        this.elem.style.top = this.y + "px";
+        this.elem.style.left = this.x + "px";
+
+        // Set movement type with increased speed (x3 factor) and enhanced sine wave
+        const r = Math.random();
+        if(r < 0.2) {
+          this.type = "sine";
+          // Increased amplitude and frequency variation
+          this.amplitude = Math.random() * 60 + 20; 
+          this.frequency = Math.random() * 0.1 + 0.04;
+          this.initialY = this.y;
+          this.speed = 1.5 * 3;
+        } else if(r < 0.4) {
+          this.type = "fast";
+          this.speed = 3 * 3; // fast is 3 times base, then multiplied by 3
+        } else {
+          this.type = "normal";
+          this.speed = 1.5 * 3;
+        }
+        this.hit = false;
+        // Toggle feet every 0.5 seconds to mimic running
+        this.feetInterval = setInterval(() => {
+          this.leftBig = !this.leftBig;
+          this.updateFeet();
+        }, 500);
+      }
+      updateFeet() {
+        if(this.leftBig) {
+          this.feet.innerHTML = "<span style='font-size:12pt;'>L</span> <span style='font-size:8pt;'>L</span>";
+        } else {
+          this.feet.innerHTML = "<span style='font-size:8pt;'>L</span> <span style='font-size:12pt;'>L</span>";
+        }
+      }
+      update() {
+        if(this.hit) return; // do not update if hit
+        // Base speed for normal and fast
+        this.x += this.speed;
+        // Apply sine wave motion if type is sine
+        if(this.type === "sine") {
+          this.y = this.initialY + Math.sin(this.x * this.frequency) * this.amplitude;
+          this.elem.style.top = this.y + "px";
+        }
+        this.elem.style.left = this.x + "px";
+      }
+      markHit() {
+        this.hit = true;
+        // Stop feet animation
+        clearInterval(this.feetInterval);
+      }
+      remove() {
+        clearInterval(this.feetInterval);
+        gameArea.removeChild(this.elem);
+      }
+    }
+
+function updateGame() {
+  // Spawn new tacos if fewer than MAX_TACOS active (non-hit) tacos exist
+  const activeTacos = tacos.filter(taco => !taco.hit);
+  if (activeTacos.length < MAX_TACOS) {
+    tacos.push(new Taco());
+  }
+  // Update tacos and remove those that have moved off screen (only if not hit)
+  for (let i = tacos.length - 1; i >= 0; i--) {
+    const taco = tacos[i];
+    taco.update();
+    if (taco.x > window.innerWidth && !taco.hit) {
+      taco.remove();
+      tacos.splice(i, 1);
+    }
+  }
+  animationFrame = requestAnimationFrame(updateGame);
+}
+
+    // Update crosshair position
+    window.addEventListener("mousemove", function(e) {
+      crosshair.style.left = e.clientX + "px";
+      crosshair.style.top = e.clientY + "px";
+    });
+
+    // Dot scatter effect
+    function createDots(x, y) {
+      const numDots = 8;
+      for(let i=0; i<numDots; i++){
+        let dot = document.createElement("div");
+        dot.classList.add("dot");
+        dot.style.left = x + "px";
+        dot.style.top = y + "px";
+        gameArea.appendChild(dot);
+        const angle = (Math.PI*2/numDots) * i;
+        const dx = Math.cos(angle)*30;
+        const dy = Math.sin(angle)*30;
+        dot.animate([
+          { transform: 'translate(0,0)', opacity: 1 },
+          { transform: `translate(${dx}px, ${dy}px)`, opacity: 0 }
+        ], {
+          duration: 500,
+          easing: 'ease-out'
+        }).onfinish = () => {
+          gameArea.removeChild(dot);
+        }
+      }
+    }
+
+    // Handle shooting on click
+    window.addEventListener("click", function(e) {
+      // Ignore clicks if game area isn't visible
+      if(gameArea.style.display !== "block") return;
+      if(shotsLeft <= 0) return;
+      shotsLeft--;
+      shotsCounter.textContent = "Shots: " + shotsLeft;
+      createDots(e.clientX, e.clientY);
+
+      // Check taco hits
+      tacos.forEach(taco => {
+        if(taco.hit) return;
+        const rect = taco.elem.getBoundingClientRect();
+        if(e.clientX >= rect.left && e.clientX <= rect.right &&
+           e.clientY >= rect.top && e.clientY <= rect.bottom) {
+          taco.markHit();
+          taco.elem.classList.add("flip");
+          const messages = ["Ya got me!", "I got crunched!", "Too Spicy for me!"];
+          const msgText = messages[Math.floor(Math.random()*messages.length)];
+          let msgElem = document.createElement("div");
+          msgElem.classList.add("message");
+          msgElem.textContent = msgText;
+          msgElem.style.left = (rect.left + rect.width/2 - 30) + "px";
+          msgElem.style.top = (rect.top - 25) + "px";
+          gameArea.appendChild(msgElem);
+          hits++;
+          scoreCounter.textContent = "Hits: " + hits;
+          setTimeout(() => {
+            if(msgElem.parentNode) gameArea.removeChild(msgElem);
+          }, 2000);
+        }
+      });
+      checkEndGame();
+    });
+
+    function checkEndGame() {
+      if(hits >= REQUIRED_HITS) {
+        endGame(true);
+      } else if(shotsLeft <= 0) {
+        endGame(false);
+      }
+    }
+
+    function endGame(win) {
+      cancelAnimationFrame(animationFrame);
+      // Stop taco movement
+      tacos.forEach(taco => {
+        taco.hit = true;
+        clearInterval(taco.feetInterval);
+      });
+      endContainer.style.display = "block";
+      endMessage.textContent = win ? "You're a Rootin'-Tootin' Taco Terminator!" : "No Taco Dinner for you, Tex";
+    }
+
+    // Reset game state and start game loop
+    function startGame() {
+      // Reset variables and clear any existing tacos
+      shotsLeft = MAX_SHOTS;
+      hits = 0;
+      shotsCounter.textContent = "Shots: " + shotsLeft;
+      scoreCounter.textContent = "Hits: " + hits;
+      tacos.forEach(taco => taco.remove());
+      tacos = [];
+      endContainer.style.display = "none";
+      gameArea.style.display = "block";
+      // Start game loop
+      animationFrame = requestAnimationFrame(updateGame);
+    }
+
+    startButton.addEventListener("click", function() {
+      startScreen.style.display = "none";
+      startGame();
+    });
+
+    restartButton.addEventListener("click", function() {
+      startGame();
+    });
+  </script>
+</body>
+</html>
