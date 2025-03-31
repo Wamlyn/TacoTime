@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Legend of TacoCat</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Press Start 2P', system-ui, -apple-system, sans-serif;
+            background-color: #000;
+            overflow: hidden;
+            color: #fff;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #game-world {
+            position: absolute;
+            transform-origin: top left;
+        }
+
+        #hud {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            border: 2px solid #fff;
+            border-radius: 5px;
+            z-index: 100;
+            font-size: 20px;
+        }
+
+        .tile {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background-color: #D2B48C; /* Tan color for ground */
+            text-align: center;
+            font-size: 30px;
+            line-height: 40px;
+        }
+
+        .wall {
+            background-color: #8B4513; /* Brown for walls */
+        }
+
+        .player {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            text-align: center;
+            z-index: 10;
+            transition: transform 0.1s;
+        }
+
+        .player-sprite {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        .enemy {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            text-align: center;
+            font-size: 30px;
+            line-height: 40px;
+            z-index: 5;
+        }
+
+        .heart {
+            position: absolute;
+            font-size: 24px;
+            z-index: 8;
+        }
+
+        .star {
+            position: absolute;
+            font-size: 30px;
+            line-height: 40px;
+            z-index: 5;
+        }
+
+        .collectible {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            text-align: center;
+            font-size: 30px;
+            line-height: 40px;
+            z-index: 3;
+        }
+
+        #start-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+        }
+
+        #start-screen h1 {
+            font-size: 36px;
+            color: gold;
+            margin-bottom: 30px;
+            text-shadow: 3px 3px 0 #8B4513;
+        }
+
+        #start-screen .instructions {
+            width: 80%;
+            max-width: 600px;
+            font-size: 18px;
+            line-height: 1.5;
+            margin-bottom: 30px;
+        }
+
+        #start-screen button {
+            padding: 15px 30px;
+            font-size: 20px;
+            background-color: #8B4513;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        #start-screen button:hover {
+            background-color: #A0522D;
+        }
+
+        #game-over {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.9);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 300;
+        }
+
+        #game-over h1 {
+            font-size: 48px;
+            color: gold;
+            margin-bottom: 30px;
+        }
+
+        #game-over button {
+            padding: 15px 30px;
+            font-size: 20px;
+            background-color: #8B4513;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: inherit;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="game-world"></div>
+        <div id="hud">Health: 😺 😺</div>
+    </div>
+
+    <div id="start-screen">
+        <h1>Legend of TacoCat</h1>
+        <div class="instructions">
+            <p>Welcome brave adventurer! Your quest is to find the trophy 🏆 while navigating through a world of dangers.</p>
+            <p><strong>Controls:</strong></p>
+            <p>- Move with WASD or Arrow Keys</p>
+            <p>- Press Space to shoot tacos 🌮 to defeat your foes</p>
+            <p><strong>Items:</strong></p>
+            <p>- 😻 Collect heart-eyed cats to gain health points</p>
+            <p>- 🔑 Collect keys to unlock doors 🔒</p>
+            <p>- 🌮 Use tacos to defeat enemies 👺 and destroy the pokey cacti 🌵</p>
+            <p>- Reach the trophy 🏆 to win the game</p>
+            <p><strong>Beware of enemies!</strong> They will harm you if they touch you.</p>
+        </div>
+        <button id="start-button">Start Game</button>
+    </div>
+
+    <div id="game-over">
+        <h1 id="game-over-text">Game Over!</h1>
+        <button id="restart-button">Play Again</button>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const gameWorld = document.getElementById('game-world');
+            const hudElement = document.getElementById('hud');
+            const gameContainer = document.getElementById('game-container');
+            const startScreen = document.getElementById('start-screen');
+            const startButton = document.getElementById('start-button');
+            const gameOverScreen = document.getElementById('game-over');
+            const gameOverText = document.getElementById('game-over-text');
+            const restartButton = document.getElementById('restart-button');
+
+            // Game state
+            let isGameRunning = false;
+            let gameObjects = {
+                player: null,
+                enemies: [],
+                hearts: [],
+                collectibles: [],
+                tiles: []
+            };
+            let playerStats = {
+                health: 2,
+                keys: 0,
+                direction: 'right'
+            };
+            let keysPressed = {};
+            const tileSize = 40;
+
+            // CSV map data
+            const mapData = [
+                "w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w",
+                "w,,,,,E,,,,w,,,,w,,,,,,,,w,,,,w,,,,w,,,,,,,,,,,,,,,,,,E,,M,,,,M,,M,E,M,H,w",
+                "w,G,,,E,,,,,w,,,,w,,,E,,,,,w,,,,w,,,,w,,,,,,,,,,,,,,,,,,M,,M,,M,,M,,M,,M,E,w",
+                "w,,E,E,E,E,,,E,w,,E,,w,,,,,,,,w,,,,D,,,,w,,,,,,,,,,,,,,,,,,M,,M,,M,,M,,M,,M,,w",
+                "w,,,,E,,,,,L,,,,w,D,w,w,w,D,w,w,w,,,,w,,,,w,,,,,,,,,,,,,,,,,,M,,M,,M,,M,,,,M,,w",
+                "w,,,E,E,,,,,w,,,,,,,w,,,,,D,,,,w,,,,w,,,,,,,,,,,,,,,,,,M,,M,,M,,,,M,,E,,w",
+                "w,E,,,,,,,,w,,,E,,,,w,,H,,,w,E,E,,w,,,,w,,,,,,,,,,,,,,,,,,M,,M,,M,,M,,M,M,M,M,w",
+                "w,,,,,,,,,w,,,,,,,w,,,,,w,,E,K,w,,E,,w,,,,,,,,,,,,,,,,,,M,,M,,M,,M,,,,,,w",
+                "w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,,,,w,,,,,,,,,,,,,,,,,,M,,,,M,,M,M,M,M,M,M,w",
+                "w,,,,,,,,,,,,,,,,,,,,,,,,,w,,,,w,,,,,,,,,,,,,,,,,,M,,M,,M,E,,,,,,,w",
+                "w,,,,,,,,,,,,,,,,,,,,,,,,,w,,,,w,,,,,,,,,,,,,,,,,,M,M,M,M,M,M,M,M,M,M,M,M,w",
+                "w,,,,,,,,,,,,,,,,,,,,,,,,,w,,,,w,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,w",
+                "w,,,,,,,,,,,,,,,,,,,,,,,,,w,,,,w,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,w",
+                "w,,,,,,,,,,,,,,,,,,,,,,,,,w,w,L,w,w,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,w",
+                "w,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,w",
+                "w,,,v,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,w",
+                "w,,,,,,,,,,,,,,,,,E,,,,,,,,,,,,,,,,,,,E,,,,,,,,,,,,,,,,,,,,,,,w",
+                "w,,v,,v,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,w",
+                "w,v,,E,,,v,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,E,,,,,,,,,,,,,,,w",
+                "w,,,,v,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,w",
+                "w,,v,,,,v,,v,,v,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,w",
+                "w,v,,H,,v,,,,,,,,,,,,,,,,,,,,,,,,vv,,,,,,,,,,,,,,E,,,,,,,,,,,,,,,,w",
+                "w,,,,,,E,,,,,v,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,w",
+                "w,,v,v,v,,v,,,,,,,,,,,,,,,,,,,,,,,,v,,,,,,,,,,,,,,,,,,,,,,,,,,,,,w",
+                "w,v,,,,,,,,,,,,,vv,,,,,,,,,,,,v,,,,,,,,,,,,,,,,,,,E,,,,,,,,,,,,,,w",
+                "w,,,,v,,,v,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,v,v,,,,,,,,,,,,,,,,,w",
+                "w,,,v,,,v,v,,,v,,,,,,,,,,,,E,,,,,v,,v,,v,v,,,,,,,,,,,,,,,,,,,,,,,,,,,w",
+                "w,M,M,M,M,M,M,M,M,,,,,,,,,,,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,w",
+                "w,M,M,M,M,M,M,M,M,M,M,,,,E,,,,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,w",
+                "w,M,M,M,M,M,M,M,M,,,,,,,,,,,,,,,,,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,w",
+                "w,,,,,,,,,,v,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,M,M,M,M,M,M,M,M,M,M,M,M,M,M,w",
+                "w,,,,,,,,,,,,,,,,,,,,,M,,,,,,,,,v,,,,,,,,,,,,,,,,,,,,,,,,,,,,,w",
+                "w,,,,,v,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,v,,,,,,,,,,,,,,,,,,,,,,,,w",
+                "w,,,,,,,,,,,,,v,,,,,,,,,,,,M,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,w",
+                "w,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,T,,,,,T,T,,,,,,,,,,,,,,,,w",
+                "w,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,T,,,,,,,,,w",
+                "w,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,w",
+                "w,,,,,,,,,,,,,,,,,,,,,,,,T,,,,,,T,,,,,,T,,,,,,,,,,,,T,,,,,,,,,,,w",
+                "w,M,M,,,,,,,,,E,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,w",
+                "w,M,M,M,M,,,,,,,,,,,,,,,,,,,,,,,,,,,,,T,,,,,,,,,,T,,,,,,,,,,,,,,,,w",
+                "w,,M,M,M,M,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,w",
+                "w,M,M,,,,,,,,,,,,,,,,,,,,,,,,,,,T,T,T,,,T,T,,,T,,T,T,,,,,,,,,,,,,,,,,,w",
+                "w,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,w",
+                "w,,,,,,,,,,,,,,,,,,E,,,,,,,,,,,,,,,,,T,,,E,,,,T,,,,,,,,,,T,,,,,,,w",
+                "w,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,w",
+                "w,,,,,,,,,,,,,,,,,,,,,,,,,,,,T,,T,T,,T,,,T,,,T,T,,,,,,,,,,,E,,,,,,,,w",
+                "w,,,,,,,,,,,,,,,,,,M,M,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,w",
+                "w,,,,,,,,,,,,,,,,M,M,M,M,M,,,,,,,,,,,,,,,T,,,,,,,,,,,,,,T,,,,,,T,,,T,w",
+                "w,,,C,,,,,,,C,,,,,,,,,M,M,M,M,M,M,,,,,,,,,,,,,,,T,,,,,,,,,,,,,,,,,,,,w",
+                "w,,,,,,,,,,,,,C,,,,,,,,,,M,M,M,M,M,M,M,,,,,,,,,,,,,,,,,,,T,,,,,T,,T,,T,,w",
+                "w,C,,,C,,,,,,,,,,,C,,,,,,,,,,,M,M,M,M,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,w",
+                "w,CC,,,,,C,,,E,,,,,,,,,C,,,,,,,,,,,,,,,,,,,,,,,,T,,,,,,T,,,T,,T,,T,,T,,w",
+                "w,C,C,C,,,,,C,,,,,,,,C,,,,,,,,,,,,M,,,,,,,,,,,,,,,,,,,,,,,T,,T,T,,,,H,w",
+                "w,C,C,C,,,C,,C,,,C,,,,,,,,,,,,,,,M,M,,,,,,,,,,,,,,,,,,,,,T,,,T,,,T,T,T,T,T,w",
+                "w,K,C,C,,,C,,,C,,,,,,,,,C,,,,,,M,M,M,,,,,,,,,,,T,,,,,,,,,,,,T,,T,,,,,,,,w",
+                "w,C,C,C,C,,,,,C,,,C,,,C,,,,,,,,M,M,M,M,,,,,,,,,,,,,,,,,,,,,,,,,T,T,,,,,,s,w",
+                "w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w"
+            ];
+
+            // Map parsing functions
+            function createMap() {
+                const map = [];
+                for (let y = 0; y < mapData.length; y++) {
+                    const row = mapData[y].split(',');
+                    map.push(row);
+                }
+                return map;
+            }
+
+            // Create an 8-bit style cat as the player sprite
+            function createPlayerSprite() {
+                const directions = ['up', 'right', 'down', 'left'];
+                const sprites = {};
+
+                directions.forEach(dir => {
+                    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                    svg.setAttribute("width", "40");
+                    svg.setAttribute("height", "40");
+                    svg.setAttribute("viewBox", "0 0 40 40");
+
+                    // Cat body (gray)
+                    const body = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                    body.setAttribute("x", "10");
+                    body.setAttribute("y", "12");
+                    body.setAttribute("width", "20");
+                    body.setAttribute("height", "20");
+                    body.setAttribute("fill", "#888");
+                    body.setAttribute("rx", "2");
+                    svg.appendChild(body);
+
+                    // White face
+                    const face = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                    face.setAttribute("cx", "20");
+                    face.setAttribute("cy", "20");
+                    face.setAttribute("r", "8");
+                    face.setAttribute("fill", "white");
+                    svg.appendChild(face);
+
+                    // Eyes (two black dots)
+                    let eyeX1, eyeX2, eyeY;
+                    switch(dir) {
+                        case 'up':
+                            eyeX1 = 17; eyeX2 = 23; eyeY = 18;
+                            break;
+                        case 'right':
+                            eyeX1 = 23; eyeX2 = 25; eyeY = 18;
+                            break;
+                        case 'down':
+                            eyeX1 = 17; eyeX2 = 23; eyeY = 22;
+                            break;
+                        case 'left':
+                            eyeX1 = 15; eyeX2 = 17; eyeY = 18;
+                            break;
+                    }
+
+                    const eye1 = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                    eye1.setAttribute("cx", eyeX1);
+                    eye1.setAttribute("cy", eyeY);
+                    eye1.setAttribute("r", "1.5");
+                    eye1.setAttribute("fill", "black");
+                    svg.appendChild(eye1);
+
+                    const eye2 = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                    eye2.setAttribute("cx", eyeX2);
+                    eye2.setAttribute("cy", eyeY);
+                    eye2.setAttribute("r", "1.5");
+                    eye2.setAttribute("fill", "black");
+                    svg.appendChild(eye2);
+
+                    // Tail
+                    if (dir === 'right') {
+                        const tail = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                        tail.setAttribute("d", "M10 20 Q5 15 8 10");
+                        tail.setAttribute("stroke", "#888");
+                        tail.setAttribute("stroke-width", "3");
+                        tail.setAttribute("fill", "none");
+                        svg.appendChild(tail);
+                    } else if (dir === 'left') {
+                        const tail = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                        tail.setAttribute("d", "M30 20 Q35 15 32 10");
+                        tail.setAttribute("stroke", "#888");
+                        tail.setAttribute("stroke-width", "3");
+                        tail.setAttribute("fill", "none");
+                        svg.appendChild(tail);
+                    } else if (dir === 'up') {
+                        const tail = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                        tail.setAttribute("d", "M20 32 Q25 35 30 32");
+                        tail.setAttribute("stroke", "#888");
+                        tail.setAttribute("stroke-width", "3");
+                        tail.setAttribute("fill", "none");
+                        svg.appendChild(tail);
+                    } else if (dir === 'down') {
+                        const tail = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                        tail.setAttribute("d", "M20 8 Q25 5 30 8");
+                        tail.setAttribute("stroke", "#888");
+                        tail.setAttribute("stroke-width", "3");
+                        tail.setAttribute("fill", "none");
+                        svg.appendChild(tail);
+                    }
+
+                    sprites[dir] = svg.outerHTML;
+                });
+
+                return sprites;
+            }
+
+            // Game initialization
+            function initGame() {
+                // Clear previous game
+                gameWorld.innerHTML = '';
+                gameObjects = {
+                    player: null,
+                    enemies: [],
+                    hearts: [],
+                    collectibles: [],
+                    tiles: []
+                };
+                playerStats = {
+                    health: 2,
+                    keys: 0,
+                    direction: 'right'
+                };
+                
+                // Create map
+                const map = createMap();
+                
+                // Create player sprites
+                const playerSprites = createPlayerSprite();
+                
+                // Render the map
+                let playerX = 0;
+                let playerY = 0;
+                
+                for (let y = 0; y < map.length; y++) {
+                    for (let x = 0; x < map[y].length; x++) {
+                        const tileType = map[y][x].trim();
+                        const tileX = x * tileSize;
+                        const tileY = y * tileSize;
+                        
+                        // Create tile element
+                        const tile = document.createElement('div');
+                        tile.className = 'tile';
+                        tile.style.left = `${tileX}px`;
+                        tile.style.top = `${tileY}px`;
+                        
+                        let isPassable = true;
+                        let isDestructible = false;
+                        
+                        // Set tile properties based on type
+                        switch(tileType) {
+                            case 'w':
+                            case 'W':
+                                tile.classList.add('wall');
+                                tile.textContent = '';
+                                isPassable = false;
+                                break;
+                            case 'M':
+                                tile.textContent = '⛰️';
+                                isPassable = false;
+                                break;
+                            case 't':
+                            case 'T':
+                                tile.textContent = '🌳';
+                                isPassable = false;
+                                break;
+                            case 'v':
+                            case 'V':
+                                tile.textContent = '🌲';
+                                isPassable = false;
+                                break;
+                            case 'C':
+                                tile.textContent = '🌵';
+                                isPassable = false;
+                                isDestructible = true;
+                                break;
+                            case 'E':
+                                tile.textContent = '';
+                                // Create enemy
+                                const enemy = document.createElement('div');
+                                enemy.className = 'enemy';
+                                enemy.textContent = '👺';
+                                enemy.style.left = `${tileX}px`;
+                                enemy.style.top = `${tileY}px`;
+                                gameWorld.appendChild(enemy);
+                                
+                                gameObjects.enemies.push({
+                                    element: enemy,
+                                    x: tileX,
+                                    y: tileY,
+                                    speedX: Math.random() > 0.8 ? 0.8 : -0.8,
+                                    speedY: Math.random() > 0.8 ? 0.8 : -0.8,
+                                    size: tileSize
+                                });
+                                break;
+                            case 'L':
+                                tile.textContent = '🔒';
+                                isPassable = false;
+                                tile.dataset.isLock = 'true';
+                                break;
+                            case 'D':
+                                tile.textContent = '🚪';
+                                break;
+                            case 'H':
+                                // Create health collectible
+                                const health = document.createElement('div');
+                                health.className = 'collectible';
+                                health.textContent = '😻';
+                                health.style.left = `${tileX}px`;
+                                health.style.top = `${tileY}px`;
+                                health.dataset.type = 'health';
+                                gameWorld.appendChild(health);
+                                
+                                gameObjects.collectibles.push({
+                                    element: health,
+                                    x: tileX,
+                                    y: tileY,
+                                    type: 'health',
+                                    size: tileSize
+                                });
+                                break;
+                            case 'K':
+                                // Create key collectible
+                                const key = document.createElement('div');
+                                key.className = 'collectible';
+                                key.textContent = '🔑';
+                                key.style.left = `${tileX}px`;
+                                key.style.top = `${tileY}px`;
+                                key.dataset.type = 'key';
+                                gameWorld.appendChild(key);
+                                
+                                gameObjects.collectibles.push({
+                                    element: key,
+                                    x: tileX,
+                                    y: tileY,
+                                    type: 'key',
+                                    size: tileSize
+                                });
+                                break;
+                            case 'G':
+                                // Create goal trophy
+                                tile.textContent = '🏆';
+                                tile.dataset.isGoal = 'true';
+                                break;
+                            case 's':
+                                // Starting position for player
+                                playerX = tileX;
+                                playerY = tileY;
+                                break;
+                        }
+                        
+                        // Store tile data
+                        gameObjects.tiles.push({
+                            element: tile,
+                            x: tileX,
+                            y: tileY,
+                            isPassable: isPassable,
+                            isDestructible: isDestructible,
+                            isLock: tileType === 'L',
+                            isGoal: tileType === 'G',
+                            size: tileSize
+                        });
+                        
+                        gameWorld.appendChild(tile);
+                    }
+                }
+                
+                // Create player
+                const player = document.createElement('div');
+                player.className = 'player';
+                player.style.left = `${playerX}px`;
+                player.style.top = `${playerY}px`;
+                
+                const playerSpriteContainer = document.createElement('div');
+                playerSpriteContainer.className = 'player-sprite';
+                playerSpriteContainer.innerHTML = playerSprites.right;
+                player.appendChild(playerSpriteContainer);
+                
+                gameWorld.appendChild(player);
+                
+                gameObjects.player = {
+                    element: player,
+                    spriteContainer: playerSpriteContainer,
+                    sprites: playerSprites,
+                    x: playerX,
+                    y: playerY,
+                    speed: 3,
+                    size: tileSize
+                };
+                
+                // If no starting position found, default to first open space
+                if (playerX === 0 && playerY === 0) {
+                    for (const tile of gameObjects.tiles) {
+                        if (tile.isPassable) {
+                            gameObjects.player.x = tile.x;
+                            gameObjects.player.y = tile.y;
+                            gameObjects.player.element.style.left = `${tile.x}px`;
+                            gameObjects.player.element.style.top = `${tile.y}px`;
+                            break;
+                        }
+                    }
+                }
+                
+                // Center the camera on the player
+                centerCamera();
+                
+                // Start the game loop
+                isGameRunning = true;
+                requestAnimationFrame(gameLoop);
+                
+                // Update HUD
+                updateHud();
+            }
+            
+            // Game loop
+            function gameLoop() {
+                if (!isGameRunning) return;
+                
+                movePlayer();
+                moveEnemies();
+                moveHearts();
+                checkCollisions();
+                
+                requestAnimationFrame(gameLoop);
+            }
+            
+            // Player movement
+            function movePlayer() {
+                const player = gameObjects.player;
+                let dx = 0;
+                let dy = 0;
+                
+                if (keysPressed['ArrowUp'] || keysPressed['w'] || keysPressed['W']) {
+                    dy = -player.speed;
+                    playerStats.direction = 'up';
+                }
+                if (keysPressed['ArrowDown'] || keysPressed['s'] || keysPressed['S']) {
+                    dy = player.speed;
+                    playerStats.direction = 'down';
+                }
+                if (keysPressed['ArrowLeft'] || keysPressed['a'] || keysPressed['A']) {
+                    dx = -player.speed;
+                    playerStats.direction = 'left';
+                }
+                if (keysPressed['ArrowRight'] || keysPressed['d'] || keysPressed['D']) {
+                    dx = player.speed;
+                    playerStats.direction = 'right';
+                }
+                
+                // Update player sprite based on direction
+                player.spriteContainer.innerHTML = player.sprites[playerStats.direction];
+                
+                // Check for collisions with solid objects
+                if (dx !== 0 || dy !== 0) {
+                    const newX = player.x + dx;
+                    const newY = player.y + dy;
+                    
+                // Use a smaller collision box for the player (center point with padding)
+                    const collisionPadding = 12; // Adjust this value as needed
+                    const playerHitbox = {
+                x: newX + collisionPadding,
+                y: newY + collisionPadding,
+                width: player.size - collisionPadding * 2,
+                height: player.size - collisionPadding * 2
+            };
+
+                // Check for collision with tiles
+                    let canMove = true;
+                    
+                    for (const tile of gameObjects.tiles) {
+                        if (!tile.isPassable) {
+                           // Collision detection with smaller player hitbox
+                        if (
+                       playerHitbox.x < tile.x + tile.size &&
+                       playerHitbox.x + playerHitbox.width > tile.x &&
+                       playerHitbox.y < tile.y + tile.size &&
+                       playerHitbox.y + playerHitbox.height > tile.y
+                       ) {
+                    canMove = false;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (canMove) {
+                        player.x = newX;
+                        player.y = newY;
+                        player.element.style.left = `${player.x}px`;
+                        player.element.style.top = `${player.y}px`;
+                        
+                        // Center the camera on the player
+                        centerCamera();
+                    }
+                }
+            }
+            
+            // Enemy movement
+            function moveEnemies() {
+                for (const enemy of gameObjects.enemies) {
+                    // Move enemy
+                    enemy.x += enemy.speedX;
+                    enemy.y += enemy.speedY;
+                    
+                    // Check for collisions with walls
+                    let hitWall = false;
+                    
+                    for (const tile of gameObjects.tiles) {
+                        if (!tile.isPassable) {
+                            if (
+                                enemy.x < tile.x + tile.size &&
+                                enemy.x + enemy.size > tile.x &&
+                                enemy.y < tile.y + tile.size &&
+                                enemy.y + enemy.size > tile.y
+                            ) {
+                                hitWall = true;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Bounce off walls
+                    if (hitWall) {
+                        enemy.speedX = -enemy.speedX + (Math.random() * 0.2 - 0.1);
+                        enemy.speedY = -enemy.speedY + (Math.random() * 0.2 - 0.1);
+                        
+                        // Keep speed within bounds
+                        enemy.speedX = Math.max(-9, Math.min(9, enemy.speedX));
+                        enemy.speedY = Math.max(-9, Math.min(9, enemy.speedY));
+                    }
+                    
+                    // Occasionally change direction
+                    if (Math.random() < 0.01) {
+                        enemy.speedX = Math.random() - 0.5;
+                        enemy.speedY = Math.random() - 0.5;
+                    }
+                    
+                    // Update enemy position
+                    enemy.element.style.left = `${enemy.x}px`;
+                    enemy.element.style.top = `${enemy.y}px`;
+                }
+            }
+            
+            // Heart projectile movement
+            function moveHearts() {
+                for (let i = gameObjects.hearts.length - 1; i >= 0; i--) {
+                    const heart = gameObjects.hearts[i];
+                    
+                    // Move heart
+                    heart.x += heart.speedX;
+                    heart.y += heart.speedY;
+                    
+                    // Update heart position
+                    heart.element.style.left = `${heart.x}px`;
+                    heart.element.style.top = `${heart.y}px`;
+                    
+                    // Check if heart has traveled its max distance
+                    heart.distance += Math.sqrt(heart.speedX * heart.speedX + heart.speedY * heart.speedY);
+                    if (heart.distance > 300) {
+                        heart.element.remove();
+                        gameObjects.hearts.splice(i, 1);
+                        continue;
+                    }
+                    
+                    // Check for collisions with walls
+                    for (const tile of gameObjects.tiles) {
+                        if (!tile.isPassable) {
+                            if (
+                                heart.x < tile.x + tile.size &&
+                                heart.x + heart.size > tile.x &&
+                                heart.y < tile.y + tile.size &&
+                                heart.y + heart.size > tile.y
+                            ) {
+                                // If tile is destructible, destroy it
+                                if (tile.isDestructible) {
+                                    tile.element.textContent = '';
+                                    tile.isPassable = true;
+                                    tile.isDestructible = false;
+                                }
+                                
+                                // Remove heart
+                                heart.element.remove();
+                                gameObjects.hearts.splice(i, 1);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Check for collisions with collectibles and enemies
+            function checkCollisions() {
+                const player = gameObjects.player;
+                
+                // Check player collision with collectibles
+                for (let i = gameObjects.collectibles.length - 1; i >= 0; i--) {
+                    const collectible = gameObjects.collectibles[i];
+                    
+                    if (
+                        player.x < collectible.x + collectible.size &&
+                        player.x + player.size > collectible.x &&
+                        player.y < collectible.y + collectible.size &&
+                        player.y + player.size > collectible.y
+                    ) {
+                        // Handle collectible based on type
+                        if (collectible.type === 'health') {
+                            playerStats.health++;
+                        } else if (collectible.type === 'key') {
+                            playerStats.keys++;
+                        }
+                        
+                        // Remove collectible
+                        collectible.element.remove();
+                        gameObjects.collectibles.splice(i, 1);
+                        
+                        // Update HUD
+                        updateHud();
+                    }
+                }
+                
+                // Check player collision with enemies
+                for (let i = gameObjects.enemies.length - 1; i >= 0; i--) {
+                    const enemy = gameObjects.enemies[i];
+                    
+                    if (
+                        player.x < enemy.x + enemy.size &&
+                        player.x + player.size > enemy.x &&
+                        player.y < enemy.y + enemy.size &&
+                        player.y + player.size > enemy.y
+                    ) {
+                        // Player takes damage
+                        playerStats.health--;
+                        
+                        // Update HUD
+                        updateHud();
+                        
+                        // Push enemy away
+                        const dx = player.x - enemy.x;
+                        const dy = player.y - enemy.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        enemy.x -= (dx / dist) * 50;
+                        enemy.y -= (dy / dist) * 50;
+                        
+                        // Check if player has no health left
+                        if (playerStats.health <= 0) {
+                            gameOver(false);
+                        }
+                    }
+                }
+                
+                // Check heart collision with enemies
+                for (let i = gameObjects.hearts.length - 1; i >= 0; i--) {
+                    const heart = gameObjects.hearts[i];
+                    
+                    for (let j = gameObjects.enemies.length - 1; j >= 0; j--) {
+                        const enemy = gameObjects.enemies[j];
+                        
+                        if (
+                            heart.x < enemy.x + enemy.size &&
+                            heart.x + heart.size > enemy.x &&
+                            heart.y < enemy.y + enemy.size &&
+                            heart.y + heart.size > enemy.y
+                        ) {
+                            // Create star effect
+                            const star = document.createElement('div');
+                            star.className = 'star';
+                            star.textContent = '💀';
+                            star.style.left = `${enemy.x}px`;
+                            star.style.top = `${enemy.y}px`;
+                            gameWorld.appendChild(star);
+                            
+                            // Remove enemy
+                            enemy.element.remove();
+                            gameObjects.enemies.splice(j, 1);
+                            
+                            // Remove heart
+                            heart.element.remove();
+                            gameObjects.hearts.splice(i, 1);
+                            
+                            // Remove star after delay
+                            setTimeout(() => {
+                                star.remove();
+                            }, 2000);
+                            
+                            break;
+                        }
+                    }
+                }
+                
+                // Check if player reached goal
+                for (const tile of gameObjects.tiles) {
+                    if (tile.isGoal) {
+                        if (
+                            player.x < tile.x + tile.size &&
+                            player.x + player.size > tile.x &&
+                            player.y < tile.y + tile.size &&
+                            player.y + player.size > tile.y
+                        ) {
+                            gameOver(true);
+                        }
+                    }
+                    
+                    // Check if player can unlock a lock
+                    if (tile.isLock) {
+                        if (
+                            player.x < tile.x + tile.size &&
+                            player.x + player.size > tile.x &&
+                            player.y < tile.y + tile.size &&
+                            player.y + player.size > tile.y
+                        ) {
+                            if (playerStats.keys > 0) {
+                                // Unlock door
+                                tile.element.textContent = '🚪';
+                                tile.isPassable = true;
+                                tile.isLock = false;
+                                
+                                // Use key
+                                playerStats.keys--;
+                                
+                                // Update HUD
+                                updateHud();
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Shoot heart
+            function shootHeart() {
+                if (!isGameRunning) return;
+                
+                const player = gameObjects.player;
+                
+                // Create heart element
+                const heart = document.createElement('div');
+                heart.className = 'heart';
+                heart.textContent = '🌮';
+                heart.style.left = `${player.x + player.size / 2 - 10}px`;
+                heart.style.top = `${player.y + player.size / 2 - 10}px`;
+                gameWorld.appendChild(heart);
+                
+                // Set heart speed based on player direction
+                let speedX = 0;
+                let speedY = 0;
+                const speed = 5;
+                
+                switch (playerStats.direction) {
+                    case 'up':
+                        speedY = -speed;
+                        break;
+                    case 'down':
+                        speedY = speed;
+                        break;
+                    case 'left':
+                        speedX = -speed;
+                        break;
+                    case 'right':
+                        speedX = speed;
+                        break;
+                }
+                
+                // Add heart to game objects
+                gameObjects.hearts.push({
+                    element: heart,
+                    x: player.x + player.size / 2 - 10,
+                    y: player.y + player.size / 2 - 10,
+                    speedX: speedX,
+                    speedY: speedY,
+                    size: 20,
+                    distance: 0
+                });
+            }
+            
+            // Center camera on player
+            function centerCamera() {
+                const player = gameObjects.player;
+                const containerWidth = gameContainer.clientWidth;
+                const containerHeight = gameContainer.clientHeight;
+                
+                const cameraX = player.x + player.size / 2 - containerWidth / 2;
+                const cameraY = player.y + player.size / 2 - containerHeight / 2;
+                
+                gameWorld.style.transform = `translate(${-cameraX}px, ${-cameraY}px)`;
+            }
+            
+            // Update HUD
+            function updateHud() {
+                let healthText = 'Health: ';
+                for (let i = 0; i < playerStats.health; i++) {
+                    healthText += '😺 ';
+                }
+                
+                if (playerStats.keys > 0) {
+                    healthText += `| Keys: ${playerStats.keys} 🔑`;
+                }
+                
+                hudElement.textContent = healthText;
+            }
+            
+            // Game over function
+            function gameOver(isWin) {
+                isGameRunning = false;
+                
+                // Display game over message
+                gameOverText.textContent = isWin ? 'You Win!' : 'Game Over';
+                gameOverScreen.style.display = 'flex';
+            }
+            
+            // Event listeners
+            document.addEventListener('keydown', (e) => {
+                keysPressed[e.key] = true;
+                
+                // Space to shoot
+                if (e.key === ' ' && isGameRunning) {
+                    shootHeart();
+                }
+                
+                // Prevent default action for arrow keys to avoid page scrolling
+                if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
+                    e.preventDefault();
+                }
+            });
+            
+            document.addEventListener('keyup', (e) => {
+                keysPressed[e.key] = false;
+            });
+            
+            // Start button
+            startButton.addEventListener('click', () => {
+                startScreen.style.display = 'none';
+                initGame();
+            });
+            
+            // Restart button
+            restartButton.addEventListener('click', () => {
+                gameOverScreen.style.display = 'none';
+                initGame();
+            });
+        });
+    </script>
+</body>
+</html>
