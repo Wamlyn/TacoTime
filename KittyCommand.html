@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kitty Command</title>
+  <!-- Add Google Fonts import for Press Start 2P -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Press Start 2P', cursive;
+      overflow: hidden;
+      background-color: #222;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      touch-action: manipulation;
+    }
+    
+    #game-container {
+      position: relative;
+      width: 360px;
+      height: 640px;
+      background-color: #00008B; /* Dark blue background */
+      overflow: hidden;
+      border-radius: 10px;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+    }
+    
+    #start-screen {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.8);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+      color: white;
+      text-align: center;
+      padding: 20px;
+    }
+    
+    #start-screen h1 {
+      font-size: 28px;
+      margin-bottom: 30px;
+      color: #f8d434;
+      line-height: 1.4;
+    }
+    
+    #start-screen p {
+      margin-bottom: 15px;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    
+    #start-button {
+      padding: 12px 24px;
+      font-size: 14px;
+      background-color: #f8d434;
+      border: none;
+      border-radius: 4px;
+      color: #222;
+      cursor: pointer;
+      margin-top: 20px;
+      font-weight: normal;
+      font-family: 'Press Start 2P', cursive;
+    }
+    
+    #game-over-screen {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.8);
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+      color: white;
+      text-align: center;
+    }
+    
+    #game-over-screen h2 {
+      font-size: 24px;
+      margin-bottom: 20px;
+      color: #ff6347;
+      line-height: 1.4;
+    }
+    
+    #restart-button {
+      padding: 12px 24px;
+      font-size: 14px;
+      background-color: #f8d434;
+      border: none;
+      border-radius: 4px;
+      color: #222;
+      cursor: pointer;
+      margin-top: 20px;
+      font-weight: normal;
+      font-family: 'Press Start 2P', cursive;
+    }
+    
+    #level-up-screen {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.8);
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+      color: white;
+      text-align: center;
+    }
+    
+    #level-up-screen h2 {
+      font-size: 24px;
+      margin-bottom: 20px;
+      color: #32cd32;
+      line-height: 1.4;
+    }
+    
+    #continue-button {
+      padding: 12px 24px;
+      font-size: 14px;
+      background-color: #f8d434;
+      border: none;
+      border-radius: 4px;
+      color: #222;
+      cursor: pointer;
+      margin-top: 20px;
+      font-weight: normal;
+      font-family: 'Press Start 2P', cursive;
+    }
+    
+    #city {
+      position: absolute;
+      bottom: 0;
+      width: 100%;
+      height: 80px;
+      display: flex;
+      justify-content: space-around;
+    }
+    
+    .building {
+      width: 30px;
+      height: 60px;
+      background-color: #8B4513;
+      position: absolute; /* changed from relative */
+      bottom: 0;
+      border-radius: 4px 4px 0 0;
+      transition: opacity 0.5s ease;
+    }
+    
+    .building::before {
+      content: '';
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      background-color: #000;
+      border-radius: 50%;
+      bottom: 10px;
+      left: 5px;
+    }
+    
+    .building::after {
+      content: '';
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      background-color: #000;
+      border-radius: 50%;
+      bottom: 25px;
+      right: 5px;
+    }
+    
+    #hud {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      font-size: 12px;
+      text-shadow: 1px 1px 2px black;
+      z-index: 10;
+      background-color: rgba(0, 0, 0, 0.5);
+      padding: 8px 12px;
+      border-radius: 5px;
+      letter-spacing: -1px;
+    }
+    
+    .entity {
+      position: absolute;
+      font-size: 24px;
+      transform: translate(-50%, -50%);
+      z-index: 5;
+    }
+    
+    .mouse {
+      font-size: 24px;
+    }
+    
+    .rat {
+      font-size: 28px;
+    }
+    
+    .laser {
+      width: 12px;
+      height: 12px;
+      background-color: red;
+      border-radius: 50%;
+      box-shadow: 0 0 10px red;
+    }
+    
+    .death {
+      font-size: 28px;
+      animation: fade 2s forwards;
+    }
+    
+    .eating {
+      position: absolute;
+      animation: eat 3s forwards;
+    }
+    
+    @keyframes fade {
+      0% { opacity: 1; }
+      70% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+    
+    @keyframes eat {
+      0% { opacity: 1; }
+      80% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+    
+    /* Updated paw styling with animation */
+    #paw {
+      position: absolute;
+      width: 80px;
+      height: 200px;
+      display: none;
+      z-index: 20;
+      pointer-events: none;
+      transform-origin: bottom center;
+    }
+    
+    .paw-shadow {
+      position: absolute;
+      width: 70px;
+      height: 190px;
+      border-radius: 30px 30px 15px 15px;
+      background-color: #666;
+      left: 5px;
+      top: 0;
+    }
+    
+    .paw-light {
+      position: absolute;
+      width: 60px;
+      height: 180px;
+      border-radius: 25px 25px 10px 10px;
+      background-color: #999;
+      left: 10px;
+      top: 5px;
+    }
+    
+    .toe {
+      position: absolute;
+      width: 15px;
+      height: 20px;
+      background-color: #999;
+      border-radius: 10px;
+      top: 5px;
+    }
+    
+    .toe-1 { left: 5px; }
+    .toe-2 { left: 23px; }
+    .toe-3 { left: 40px; }
+    
+    .toe-shadow {
+      position: absolute;
+      width: 12px;
+      height: 16px;
+      background-color: #666;
+      border-radius: 8px;
+      top: 7px;
+    }
+    
+    .toe-shadow-1 { left: 6px; }
+    .toe-shadow-2 { left: 24px; }
+    .toe-shadow-3 { left: 41px; }
+    
+    .claw {
+      position: absolute;
+      width: 10px;
+      height: 12px;
+      background-color: #ddd;
+      border-radius: 50% 50% 0 0;
+      transform: rotate(-30deg);
+      top: -5px;
+    }
+    
+    .claw-1 { left: 6px; }
+    .claw-2 { left: 24px; }
+    .claw-3 { left: 41px; }
+    
+    @keyframes swipe {
+      0% { transform: translateY(-100px) rotate(20deg); opacity: 0; }
+      10% { opacity: 1; }
+      50% { transform: translateY(0) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(50px) rotate(-10deg); opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container">
+    <div id="start-screen">
+      <h1>Kitty Command</h1>
+      <p>Protect your home's cracker stash from hungry mice and rats!</p>
+      <p>Swat at them by tapping or clicking the screen.</p>
+      <p>Eliminate 10 vermin to advance to the next level</p>
+      <p>Don't let too many or you'll be out of a job'</p>
+      <button id="start-button">Player 1 Start</button>
+    </div>
+    
+    <div id="game-over-screen">
+      <h2>Game Over!</h2>
+      <p>The mice and rats have eaten too much of your human's food'!</p>
+      <button id="restart-button">Start Over</button>
+    </div>
+    
+    <div id="level-up-screen">
+      <h2>Level Complete!</h2>
+      <p>You've protected your kitchen for now!</p>
+      <p>The next wave will be faster...</p>
+      <button id="continue-button">Continue</button>
+    </div>
+    
+    <div id="hud">
+      <div>Level: <span id="level">1</span></div>
+      <div>Destroyed: <span id="destroyed">0</span>/10</div>
+      <div>Escaped: <span id="escaped">0</span>/5</div>
+    </div>
+    
+    <div id="city"></div>
+    
+    <div id="paw">
+      <div class="paw-shadow"></div>
+      <div class="paw-light">
+        <div class="toe toe-1"></div>
+        <div class="toe toe-2"></div>
+        <div class="toe toe-3"></div>
+        <div class="toe-shadow toe-shadow-1"></div>
+        <div class="toe-shadow toe-shadow-2"></div>
+        <div class="toe-shadow toe-shadow-3"></div>
+        <div class="claw claw-1"></div>
+        <div class="claw claw-2"></div>
+        <div class="claw claw-3"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Game elements
+      const gameContainer = document.getElementById('game-container');
+      const startScreen = document.getElementById('start-screen');
+      const gameOverScreen = document.getElementById('game-over-screen');
+      const levelUpScreen = document.getElementById('level-up-screen');
+      const startButton = document.getElementById('start-button');
+      const restartButton = document.getElementById('restart-button');
+      const continueButton = document.getElementById('continue-button');
+      const city = document.getElementById('city');
+      const paw = document.getElementById('paw');
+      
+      // HUD elements
+      const levelDisplay = document.getElementById('level');
+      const destroyedDisplay = document.getElementById('destroyed');
+      const escapedDisplay = document.getElementById('escaped');
+      
+      // Game state
+      let gameActive = false;
+      let level = 1;
+      let destroyedCount = 0;
+      let escapedCount = 0;
+      let baseSpeed = 2;
+      let entities = [];
+      let buildings = [];
+      let lastSpawnTime = 0;
+      let spawnInterval = 1500; // milliseconds
+      let animationId;
+      
+      // Create city (cracker cityscape)
+      function createCity() {
+        city.innerHTML = '';
+        buildings = [];
+        const buildingCount = Math.floor(gameContainer.offsetWidth / 40);
+        
+        for (let i = 0; i < buildingCount; i++) {
+          const building = document.createElement('div');
+          building.className = 'building';
+          building.style.height = `${40 + Math.random() * 40}px`;
+          building.style.left = `${i * 40}px`; // this explicitly positions each building
+          building.dataset.index = i;
+          city.appendChild(building);
+          
+          buildings.push({
+            element: building,
+            x: i * 40 + 15, // Center of building
+            eaten: false
+          });
+        }
+      }
+      
+      // Initialize the game
+      function init() {
+        createCity();
+        createInitialEnemies();
+        
+        startButton.addEventListener('click', startGame);
+        restartButton.addEventListener('click', restartGame);
+        continueButton.addEventListener('click', nextLevel);
+        
+        gameContainer.addEventListener('click', handleClick);
+        gameContainer.addEventListener('touchstart', handleTouch, { passive: false });
+      }
+      
+      // Create initial static enemies
+      function createInitialEnemies() {
+        // Clear any existing entities
+        entities.forEach(entity => {
+          if (gameContainer.contains(entity.element)) {
+            gameContainer.removeChild(entity.element);
+          }
+        });
+        entities = [];
+        
+        // Create some random static enemies
+        const enemyCount = 3 + Math.floor(Math.random() * 4); // 3-6 enemies
+        
+        for (let i = 0; i < enemyCount; i++) {
+          const entityType = Math.random() < 0.5 ? 'mouse' : 'rat';
+          
+          const entity = document.createElement('div');
+          entity.className = `entity ${entityType}`;
+          
+          if (entityType === 'mouse') {
+            entity.textContent = '🐁'; // Updated mouse emoji
+          } else {
+            entity.textContent = '🐀';
+          }
+          
+          // Random position (but not too close to bottom)
+          const xPos = Math.random() * (gameContainer.offsetWidth - 50) + 25;
+          const yPos = Math.random() * (gameContainer.offsetHeight - 150);
+          
+          entity.style.left = `${xPos}px`;
+          entity.style.top = `${yPos}px`;
+          
+          const entityData = {
+            element: entity,
+            x: xPos,
+            y: yPos,
+            dx: 0, // Static
+            dy: 0, // Static
+            type: entityType
+          };
+          
+          entities.push(entityData);
+          gameContainer.appendChild(entity);
+        }
+      }
+      
+      // Start the game
+      function startGame() {
+        startScreen.style.display = 'none';
+        gameActive = true;
+        level = 1;
+        destroyedCount = 0;
+        escapedCount = 0;
+        
+        // Clear static enemies and create city
+        entities.forEach(entity => {
+          if (gameContainer.contains(entity.element)) {
+            gameContainer.removeChild(entity.element);
+          }
+        });
+        entities = [];
+        createCity();
+        
+        updateHUD();
+        gameLoop();
+      }
+      
+      // Restart the game
+      function restartGame() {
+        gameOverScreen.style.display = 'none';
+        
+        // Reset game state
+        gameActive = true;
+        level = 1;
+        destroyedCount = 0;
+        escapedCount = 0;
+        
+        // Clear all entities and reset city
+        entities.forEach(entity => {
+          if (gameContainer.contains(entity.element)) {
+            gameContainer.removeChild(entity.element);
+          }
+        });
+        entities = [];
+        createCity();
+        
+        // Update HUD
+        updateHUD();
+        
+        // Start game loop
+        gameLoop();
+      }
+      
+      // Next level
+      function nextLevel() {
+        levelUpScreen.style.display = 'none';
+        
+        // Update game state
+        level++;
+        destroyedCount = 0;
+        escapedCount = 0; // Reset escaped count
+        
+        // Clear all entities but keep existing city state
+        entities.forEach(entity => {
+          if (gameContainer.contains(entity.element)) {
+            gameContainer.removeChild(entity.element);
+          }
+        });
+        entities = [];
+        
+        // Regenerate full city for new level
+        createCity();
+
+        // Update HUD
+        updateHUD();
+        
+        // Continue game loop
+        gameActive = true;
+        gameLoop();
+      }
+      
+      // Update HUD
+      function updateHUD() {
+        levelDisplay.textContent = level;
+        destroyedDisplay.textContent = destroyedCount;
+        escapedDisplay.textContent = escapedCount;
+      }
+      
+      // Find nearest building
+      function findNearestBuilding(x) {
+        let nearest = null;
+        let minDistance = Infinity;
+        
+        for (let i = 0; i < buildings.length; i++) {
+          if (!buildings[i].eaten) {
+            const distance = Math.abs(buildings[i].x - x);
+            if (distance < minDistance) {
+              minDistance = distance;
+              nearest = buildings[i];
+            }
+          }
+        }
+        
+        return nearest;
+      }
+      
+      // Spawn entities
+      function spawnEntity() {
+        const now = Date.now();
+        
+        if (now - lastSpawnTime > spawnInterval) {
+          const entityType = Math.random() < 0.2 ? 'laser' : (Math.random() < 0.5 ? 'mouse' : 'rat');
+          
+          const entity = document.createElement('div');
+          entity.className = `entity ${entityType}`;
+          
+          if (entityType === 'mouse') {
+            entity.textContent = '🐁'; // Updated mouse emoji
+          } else if (entityType === 'rat') {
+            entity.textContent = '🐀';
+          } else {
+            entity.className = 'entity laser';
+          }
+          
+          // Position at top with random horizontal position
+          const xPos = Math.random() * (gameContainer.offsetWidth - 50) + 25;
+          entity.style.left = `${xPos}px`;
+          entity.style.top = '0px';
+          
+          // Set random angle (direction)
+          const angle = (Math.random() * 60 - 30) * (Math.PI / 180);
+          const speed = baseSpeed * (level * 0.15 + 0.85) * (entityType === 'rat' ? 2 : 1);
+          
+          const entityData = {
+            element: entity,
+            x: xPos,
+            y: 0,
+            dx: Math.sin(angle) * speed,
+            dy: Math.cos(angle) * speed,
+            type: entityType,
+            reachedBottom: false,
+            targetBuilding: null
+          };
+          
+          entities.push(entityData);
+          gameContainer.appendChild(entity);
+          
+          lastSpawnTime = now;
+        }
+      }
+      
+      // Move entities
+      function moveEntities() {
+        for (let i = entities.length - 1; i >= 0; i--) {
+          const entity = entities[i];
+          
+          // If entity has reached bottom and is heading to a building
+          if (entity.reachedBottom && entity.targetBuilding) {
+            // Move entity to the target building
+            const targetX = entity.targetBuilding.x;
+            const targetY = gameContainer.offsetHeight - 80;
+            
+            // Simple linear movement to target
+            const dx = (targetX - entity.x) * 0.1;
+            const dy = (targetY - entity.y) * 0.1;
+            
+            entity.x += dx;
+            entity.y += dy;
+            
+            // Check if entity has reached building
+            if (Math.abs(entity.x - targetX) < 5 && Math.abs(entity.y - targetY) < 5) {
+              // Create "eating" animation
+              const eatingEntity = document.createElement('div');
+              eatingEntity.className = 'entity eating';
+              eatingEntity.textContent = entity.element.textContent;
+              eatingEntity.style.left = `${entity.x}px`;
+              eatingEntity.style.bottom = '60px';
+              gameContainer.appendChild(eatingEntity);
+              
+              // Make building disappear
+              entity.targetBuilding.eaten = true;
+              entity.targetBuilding.element.style.opacity = '0';
+              
+              // Remove after animation
+              setTimeout(() => {
+                if (gameContainer.contains(eatingEntity)) {
+                  gameContainer.removeChild(eatingEntity);
+                }
+              }, 3000);
+              
+              // Remove entity
+              gameContainer.removeChild(entity.element);
+              entities.splice(i, 1);
+            }
+          } else {
+            // Normal movement
+            entity.x += entity.dx;
+            entity.y += entity.dy;
+            
+            // Bounce off walls
+            if (entity.x < 0 || entity.x > gameContainer.offsetWidth) {
+              entity.dx = -entity.dx;
+              entity.x += entity.dx; // prevent sticking to wall
+            }
+            
+            // Check if entity reached bottom
+            if (entity.y > gameContainer.offsetHeight - 100 && !entity.reachedBottom && (entity.type === 'mouse' || entity.type === 'rat')) {
+              entity.reachedBottom = true;
+              entity.dy = 0;
+              entity.dx = 0;
+              
+              // Find nearest available building
+              const nearestBuilding = findNearestBuilding(entity.x);
+              
+              if (nearestBuilding) {
+                entity.targetBuilding = nearestBuilding;
+              } else {
+                // No buildings left, remove entity
+                gameContainer.removeChild(entity.element);
+                entities.splice(i, 1);
+                continue;
+              }
+              
+              // Update escaped count
+              escapedCount++;
+              
+              // Check if game over
+              if (escapedCount >= 5) {
+                gameOver();
+              }
+              
+              updateHUD();
+            }
+          }
+          
+          // Update DOM element position
+          entity.element.style.left = `${entity.x}px`;
+          entity.element.style.top = `${entity.y}px`;
+          
+          // Remove entities that go too far below
+          if (entity.y > gameContainer.offsetHeight + 50 && !entity.reachedBottom) {
+            gameContainer.removeChild(entity.element);
+            entities.splice(i, 1);
+          }
+        }
+      }
+      
+      // Handle click/tap
+      function handleClick(event) {
+        if (!gameActive) return;
+        
+        const rect = gameContainer.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+        
+        swipeAt(x, y);
+      }
+      
+      function handleTouch(event) {
+        if (!gameActive) return;
+        event.preventDefault();
+        
+        const rect = gameContainer.getBoundingClientRect();
+        const touch = event.touches[0];
+        const x = touch.clientX - rect.left;
+        const y = touch.clientY - rect.top;
+        
+        swipeAt(x, y);
+      }
+      
+      // Updated Swipe animation and hit detection
+      function swipeAt(x, y) {
+        // Position paw at the click point
+        paw.style.left = `${x - 40}px`; // Center paw on click position
+        paw.style.top = `${y}px`; // Position top of paw at click point
+        paw.style.display = 'block';
+        
+        // Reset animation
+        paw.style.animation = 'none';
+        
+        // Force reflow
+        void paw.offsetWidth;
+        
+        // Apply swipe animation
+        paw.style.animation = 'swipe 0.4s forwards';
+        
+        // Hide paw after animation completes
+        setTimeout(() => {
+          paw.style.display = 'none';
+        }, 400);
+        
+        // Check for hits (use a hit radius)
+        const hitRadius = 40;
+        
+        for (let i = entities.length - 1; i >= 0; i--) {
+          const entity = entities[i];
+          
+          // Skip lasers and entities that have reached bottom
+          if (entity.type === 'laser' || entity.reachedBottom) continue;
+          
+          const distance = Math.sqrt(
+            Math.pow(x - entity.x, 2) + Math.pow(y - entity.y, 2)
+          );
+          
+          if (distance <= hitRadius) {
+            // Create death animation
+            const deathMark = document.createElement('div');
+            deathMark.className = 'entity death';
+            deathMark.textContent = '☠️';
+            deathMark.style.left = `${entity.x}px`;
+            deathMark.style.top = `${entity.y}px`;
+            gameContainer.appendChild(deathMark);
+            
+            // Remove after animation
+            setTimeout(() => {
+              if (gameContainer.contains(deathMark)) {
+                gameContainer.removeChild(deathMark);
+              }
+            }, 2000);
+            
+            // Remove entity
+            gameContainer.removeChild(entity.element);
+            entities.splice(i, 1);
+            
+            // Update destroyed count
+            destroyedCount++;
+            
+            // Check if level complete
+            if (destroyedCount >= 10) {
+              levelComplete();
+            }
+            
+            updateHUD();
+            break; // Only hit one entity
+          }
+        }
+      }
+      
+      // Game over
+      function gameOver() {
+        gameActive = false;
+        cancelAnimationFrame(animationId);
+        gameOverScreen.style.display = 'flex';
+      }
+      
+      // Level complete
+      function levelComplete() {
+        gameActive = false;
+        cancelAnimationFrame(animationId);
+        levelUpScreen.style.display = 'flex';
+      }
+      
+      // Game loop
+      function gameLoop() {
+        if (!gameActive) return;
+        
+        spawnEntity();
+        moveEntities();
+        
+        animationId = requestAnimationFrame(gameLoop);
+      }
+      
+      // Clean up when the game ends
+      function cleanup() {
+        cancelAnimationFrame(animationId);
+        entities.forEach(entity => {
+          if (gameContainer.contains(entity.element)) {
+            gameContainer.removeChild(entity.element);
+          }
+        });
+        entities = [];
+      }
+      
+      // Initialize the game
+      init();
+    });
+  </script>
+</body>
+</html>
